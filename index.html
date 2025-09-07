@@ -57,18 +57,9 @@
   <div class="wrap">
 
   <div class="card" id="weather" style="margin:18px 0">
-    <h3 class="title">☀️ Live weather (Sep 11–14)</h3>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-      <label for="wxloc"><b>Location:</b></label>
-      <select id="wxloc" style="background:#0b1524;color:#edf2f7;border:1px solid #2b3a4e;border-radius:10px;padding:8px">
-        <option value="43.7696,11.2558,Florence">Florence</option>
-        <option value="43.3188,11.3308,Siena">Siena</option>
-        <option value="43.4671,11.0420,San Gimignano">San Gimignano</option>
-        <option value="43.7160,10.4017,Pisa">Pisa</option>
-      </select>
-      <small style="opacity:.8">Source: <a href="https://open-meteo.com/en/docs" target="_blank" style="color:#8bd1ff">Open‑Meteo API</a></small>
-    </div>
-    <div id="wxgrid" class="twoCol"></div>
+    <h3 class="title">☀️ Live weather – Florence (11–14 Sep)</h3>
+    <small style="opacity:.8">Source: <a href="https://open-meteo.com/en/docs" target="_blank" style="color:#8bd1ff">Open‑Meteo API</a></small>
+    <div id="wxgrid" class="twoCol" style="margin-top:8px"></div>
     <div id="wxstamp" style="margin-top:8px;color:#8aa1b6"></div>
   </div>
 
@@ -231,8 +222,7 @@
   }
   renderItin(); initNotes(); fetchWeather();
 
-  // --- Live Weather via Open-Meteo ---
-  function renderWeather(data, place){
+  function renderWeather(data){
     const grid = document.getElementById('wxgrid');
     grid.innerHTML='';
     const days = data.daily.time;
@@ -243,7 +233,6 @@
     const wcode = data.daily.weathercode || [];
     const wwind = data.daily.windspeed_10m_max || [];
     const emoji = code => {
-      // Simple mapping per WMO weather codes
       if([0].includes(code)) return "☀️";
       if([1,2].includes(code)) return "🌤️";
       if([3].includes(code)) return "⛅";
@@ -261,53 +250,31 @@
       const rain = psum[i] != null ? ` · <span style="opacity:.9">Rain: <b>${psum[i]} mm</b></span>` : '';
       const wind = wwind[i] != null ? ` · <span style="opacity:.9">Wind: <b>${wwind[i]} km/h</b></span>` : '';
       card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-          <div><b>${new Date(d).toLocaleDateString('en-GB',{weekday:'short', day:'2-digit', month:'short'})}</b> – ${place}</div>
+          <div><b>${new Date(d).toLocaleDateString('en-GB',{weekday:'short', day:'2-digit', month:'short'})}</b> – Florence</div>
           <div style="font-size:24px">${emoji(wcode[i])}</div>
         </div>
         <div style="margin-top:4px">Max <b>${Math.round(tmax[i])}°C</b> · Min <b>${Math.round(tmin[i])}°C</b>${prob}${rain}${wind}</div>`;
       grid.appendChild(card);
     });
   }
-  
-async function fetchWeather(){
-  const monthMap = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-  const parseDay = (s)=>{
-    const m = s.match(/(\d{1,2})\s+([A-Za-z]{3})/);
-    if(!m) return null;
-    const day = parseInt(m[1],10);
-    const mon = monthMap[m[2].toLowerCase()];
-    let y = 2025;
+
+  async function fetchWeather(){
+    // Florence coords
+    const lat = 43.7696, lon = 11.2558;
+    // Fixed trip dates 2025-09-11 .. 2025-09-14
+    const start = '2025-09-11';
+    const end   = '2025-09-14';
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,windspeed_10m_max&timezone=Europe%2FRome&start_date=${start}&end_date=${end}`;
     try{
-      const sub = document.querySelector('.sub')?.textContent || '';
-      const ym = sub.match(/(20\d{2})/);
-      if(ym) y = parseInt(ym[1],10);
-    }catch(e){}
-    return new Date(Date.UTC(y, mon-1, day));
-  };
-  const first = itinerary[0]?.day ? parseDay(itinerary[0].day) : null;
-  const last  = itinerary[itinerary.length-1]?.day ? parseDay(itinerary[itinerary.length-1].day) : null;
-  const startDate = first ? first : new Date(Date.UTC(2025,8,11));
-  const endDate   = last  ? last  : new Date(Date.UTC(2025,8,14));
-
-  const fmt = (d)=>d.toISOString().slice(0,10);
-  const start = fmt(startDate);
-  const end   = fmt(endDate);
-
-  const sel = document.getElementById('wxloc');
-  const [lat,lon,name] = sel.value.split(',');
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,windspeed_10m_max&timezone=Europe%2FRome&start_date=${start}&end_date=${end}`;
-  try{
-    const res = await fetch(url);
-    const data = await res.json();
-    renderWeather(data, name);
-    const when = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Rome'});
-    document.getElementById('wxstamp').textContent = `Last updated: ${when} (Europe/Rome)`;
-  }catch(e){
-    document.getElementById('wxgrid').innerHTML = '<div class="kp">Weather unavailable right now.</div>';
+      const res = await fetch(url);
+      const data = await res.json();
+      renderWeather(data);
+      const when = new Date().toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Rome'});
+      document.getElementById('wxstamp').textContent = `Last updated: ${when} (Europe/Rome)`;
+    }catch(e){
+      document.getElementById('wxgrid').innerHTML = '<div class="kp">Weather unavailable right now.</div>';
+    }
   }
-}
-  }
-  document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='wxloc') fetchWeather(); });
 
 </script>
 </body>
